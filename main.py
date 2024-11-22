@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.sparse.linalg import svds
 
 # PATH
@@ -19,7 +20,7 @@ for line in data:
     movie_ids.append(movie_id)
     ratings.append(rating)
 
-# Loading moview
+# Loading movies
 movie_names = {}
 with open(movies_path, "r", encoding="latin-1") as f:
     for line in f:
@@ -47,28 +48,49 @@ sigma = np.diag(sigma)
 
 predicted_ratings = np.dot(np.dot(U, sigma), Vt) + avg_user[:, np.newaxis]
 
-# Recommendation
-def recommend_movies(user_id, num_recommendations=5):
+# Evaluation Metrics
+def calculate_mae(predicted, actual):
+    mask = actual > 0  # Only compare non-zero ratings
+    return np.mean(np.abs(predicted[mask] - actual[mask]))
+
+def calculate_rmse(predicted, actual):
+    mask = actual > 0  # Only compare non-zero ratings
+    return np.sqrt(np.mean((predicted[mask] - actual[mask]) ** 2))
+
+# Calculate MAE, RMSE, and Number of Ratings for Each User
+user_mae = []
+user_rmse = []
+num_ratings = []
+
+for user_id in range(1, num_users + 1):
     user_index = user_id - 1
-    user_predictions = predicted_ratings[user_index]
+    actual_ratings = rating_matrix[user_index]
+    predicted_ratings_user = predicted_ratings[user_index]
+    mae = calculate_mae(predicted_ratings_user, actual_ratings)
+    rmse = calculate_rmse(predicted_ratings_user, actual_ratings)
+    count = np.sum(actual_ratings > 0)  # Count non-zero ratings
+    user_mae.append(mae)
+    user_rmse.append(rmse)
+    num_ratings.append(count)
 
-    # Get movies the user has already rated
-    rated_movie_indices = np.where(rating_matrix[user_index] > 0)[0]
-    print(f"Movies rated by user {user_id}:")
-    for movie_index in rated_movie_indices:
-        movie_id = movie_index + 1
-        print(f"Movie {movie_names[movie_id]} with id {movie_id} has true rating: {rating_matrix[user_index, movie_index]}")
-        
-    recommendations = []
-    for movie_index, score in enumerate(user_predictions):
-        if movie_index not in rated_movie_indices:
-            recommendations.append((movie_index + 1, score))
+# Plotting Separate Graphs
+plt.figure(figsize=(12, 5))
 
-    recommendations = sorted(recommendations, key=lambda x: x[1], reverse=True)
-    return recommendations[:num_recommendations]
+# MAE Plot
+plt.subplot(1, 2, 1)
+plt.scatter(num_ratings, user_mae, color="blue", alpha=0.7, s=10)  # Reduced dot size with `s=10`
+plt.xlabel("# of True Ratings per User")
+plt.ylabel("MAE")
+plt.title("MAE vs. Number of True Ratings")
+plt.grid(alpha=0.3)
 
-user_id = 2
-recommended_movies = recommend_movies(user_id)
-print("\nRecommendations for user {}:".format(user_id))
-for movie_id, score in recommended_movies:
-    print(f"Movie {movie_names[movie_id]} with id {movie_id} has prediction {score:.2f}")
+# RMSE Plot
+plt.subplot(1, 2, 2)
+plt.scatter(num_ratings, user_rmse, color="orange", alpha=0.7, s=10)  # Reduced dot size with `s=10`
+plt.xlabel("# of True Ratings per User")
+plt.ylabel("RMSE")
+plt.title("RMSE vs. Number of True Ratings")
+plt.grid(alpha=0.3)
+
+plt.tight_layout()
+plt.show()
